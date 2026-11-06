@@ -1,0 +1,11 @@
+# Ambiente local: make up  (ou docker compose up -d)
+# Sobe a infraestrutura, o gateway e a observabilidade. Os serviços da
+# aplicação estão no perfil "app" (compose/app.yml).
+#
+# Portas: 8000 (Kong), 3000 (Grafana), 9090 (Prometheus), 16686 (Jaeger),
+# 5432 (PostgreSQL), 29092 (Kafka, acesso externo).
+name: exchange
+
+include:
+  - path: compose/infra.yml
+    project_directory: .
