@@ -1,0 +1,7 @@
+.env
+*.out
+/bin/
+/tmp/
+.idea/
+.vscode/
+testdata/fuzz/
