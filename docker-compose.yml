@@ -11,3 +11,5 @@ include:
     project_directory: .
   - path: compose/edge.yml
     project_directory: .
+  - path: compose/observability.yml
+    project_directory: .

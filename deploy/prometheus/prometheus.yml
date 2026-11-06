@@ -1,0 +1,17 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  # Descobre todas as réplicas pelo DNS do Docker (um registro A por réplica).
+  - job_name: services
+    dns_sd_configs:
+      - names: [order-service, matching-engine, quote-service, naive-service]
+        type: A
+        port: 8080
+    relabel_configs:
+      - source_labels: [__meta_dns_name]
+        target_label: service
+
+  - job_name: kong
+    static_configs:
+      - targets: ["kong:8100"]
