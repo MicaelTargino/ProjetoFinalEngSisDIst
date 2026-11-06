@@ -1,0 +1,17 @@
+// C4 nível 1 — Contexto. Renderizar: dot -Tsvg c4-context.dot -o c4-context.svg
+digraph C4Context {
+  graph [rankdir=TB, fontname="Helvetica", nodesep=0.9, ranksep=0.9, pad=0.3, bgcolor="white"];
+  node  [shape=box, style="rounded,filled", fontname="Helvetica", fontcolor="white", penwidth=0, margin="0.25,0.15"];
+  edge  [fontname="Helvetica", fontsize=10, color="#707070", fontcolor="#404040", arrowsize=0.8];
+
+  trader   [fillcolor="#08427B", label=<<b>Trader</b><br/><font point-size="10">[Pessoa]</font><br/><br/><font point-size="11">Envia ordens de compra e venda<br/>e acompanha cotações</font>>];
+  operador [fillcolor="#08427B", label=<<b>Equipe de operação</b><br/><font point-size="10">[Pessoa]</font><br/><br/><font point-size="11">Monitora saúde, latência<br/>e failover</font>>];
+
+  exchange [fillcolor="#1168BD", width=4.2, label=<<b>Plataforma de Negociação de Ativos</b><br/><font point-size="10">[Sistema de software]</font><br/><br/><font point-size="11">Casa ordens, atualiza o preço a cada negociação,<br/>mantém carteiras e distribui cotações em tempo real</font>>];
+
+  idp  [fillcolor="#999999", label=<<b>Provedor de identidade</b><br/><font point-size="10">[Sistema externo, Entrega 3]</font><br/><br/><font point-size="11">OAuth 2.0 / OIDC. Nesta entrega,<br/>tokens de demonstração</font>>];
+
+  trader   -> exchange [label="  REST (ordens, carteira)\n  WebSocket (cotações)"];
+  operador -> exchange [label="  dashboards e alertas\n  (Grafana, Jaeger)"];
+  exchange -> idp      [label="  valida identidade", style=dashed];
+}
