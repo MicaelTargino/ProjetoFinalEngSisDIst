@@ -9,3 +9,5 @@ name: exchange
 include:
   - path: compose/infra.yml
     project_directory: .
+  - path: compose/edge.yml
+    project_directory: .
