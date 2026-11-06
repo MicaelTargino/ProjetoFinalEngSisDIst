@@ -1,0 +1,35 @@
+// C4 nível 2 — Containers. Renderizar: neato -Tsvg c4-containers.dot -o c4-containers.svg
+// Posições fixas (pos="x,y!") para manter o desenho estável entre versões.
+digraph C4Containers {
+  graph [layout=neato, splines=true, overlap=true, fontname="Helvetica", pad=0.3, bgcolor="white"];
+  node  [shape=box, style="rounded,filled", fontname="Helvetica", fontcolor="white", penwidth=0, margin="0.2,0.12", fontsize=12];
+  edge  [fontname="Helvetica", fontsize=9.5, color="#707070", fontcolor="#404040", arrowsize=0.7];
+
+  boundary [pos="7.8,6.65!", width=14.7, height=7.8, shape=box, style="dashed,rounded", color="#888888", fillcolor="white", penwidth=1.2, label=""];
+  boundary_label [pos="3.0,10.3!", shape=plaintext, fontcolor="#333333", style="", label=<<b>Plataforma de Negociação de Ativos</b>  <font point-size="10">[Sistema]</font>>];
+
+  trader [pos="6.0,11.4!", fillcolor="#08427B", label=<<b>Trader</b><br/><font point-size="9">[Pessoa]</font>>];
+  kong [pos="6.0,9.7!", fillcolor="#438DD5", label=<<b>API Gateway</b><br/><font point-size="9">[Kong 3.8, DB-less]</font><br/><font point-size="10">JWT, rate limit, correlation ID</font>>];
+  obs [pos="10.6,9.7!", fillcolor="#6C8EBF", label=<<b>Observabilidade</b><br/><font point-size="9">[Prometheus, Grafana, Jaeger]</font><br/><font point-size="10">coleta /metrics de todos<br/>os serviços e do Kong</font>>];
+  naive [pos="1.9,7.6!", fillcolor="#8FB8E0", fontcolor="#1a1a1a", label=<<b>Naive Service</b><br/><font point-size="9">[Go, 3 réplicas]</font><br/><font point-size="10">Grupo de controle do<br/>experimento (sem coordenação)</font>>];
+  orders [pos="6.0,7.6!", fillcolor="#438DD5", label=<<b>Order Service</b><br/><font point-size="9">[Go, 2 réplicas]</font><br/><font point-size="10">Valida, reserva saldo (ACID),<br/>outbox, liquidação</font>>];
+  quotes [pos="10.0,7.6!", fillcolor="#438DD5", label=<<b>Quote Service</b><br/><font point-size="9">[Go, 2 réplicas]</font><br/><font point-size="10">Visão materializada,<br/>REST e WebSocket</font>>];
+  redis [pos="13.9,7.6!", shape=cylinder, fillcolor="#2E6DA4", label=<<b>Redis 7</b><br/><font point-size="10">cotações + Pub/Sub</font>>];
+  pg [pos="1.9,5.4!", shape=cylinder, fillcolor="#2E6DA4", label=<<b>PostgreSQL 16</b><br/><font point-size="10">carteiras, ordens,<br/>outbox, liquidação</font>>];
+  kafka_orders [pos="6.0,5.4!", shape=cylinder, fillcolor="#2E6DA4", label=<<b>Kafka: orders</b><br/><font point-size="10">6 partições, chave = ativo<br/>log imutável</font>>];
+  engine [pos="6.0,3.3!", fillcolor="#1168BD", label=<<b>Matching Engine</b><br/><font point-size="9">[Go, 3 réplicas]</font><br/><font point-size="10">Dono único das partições;<br/>casa ordens em sequência</font>>];
+  kafka_trades [pos="10.0,3.3!", shape=cylinder, fillcolor="#2E6DA4", label=<<b>Kafka: trades</b><br/><font point-size="10">negociações com seq<br/>por ativo</font>>];
+
+  trader -> kong [label="HTTPS / WSS"];
+  kong -> naive  [label="/api/naive", style=dashed];
+  kong -> orders [label="/api/orders\n/api/wallet"];
+  kong -> quotes [label="/api/quotes, /ws"];
+  naive  -> pg [label="SQL sem lock", style=dashed];
+  orders -> pg [label="SQL (tx)"];
+  orders -> kafka_orders [label="outbox relay"];
+  quotes -> redis [label="Lua + Pub/Sub"];
+  kafka_orders -> engine [label="consumer group\n(1 dono por partição)"];
+  engine -> kafka_trades [label="publica negociações"];
+  kafka_trades -> orders [label="liquidação\nidempotente"];
+  kafka_trades -> quotes [label="atualiza\ncotação"];
+}
