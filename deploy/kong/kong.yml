@@ -1,0 +1,58 @@
+# Configuração declarativa do Kong (modo DB-less).
+# Kong valida o JWT e aplica rate limit na borda; o order-service valida o
+# token de novo (Zero Trust).
+_format_version: "3.0"
+
+consumers:
+  - username: exchange-auth
+    jwt_secrets:
+      - key: exchange-auth            # deve ser igual ao claim "iss"
+        algorithm: HS256
+        # Segredo de DESENVOLVIMENTO, igual ao JWT_SECRET do .env.example.
+        # Na Entrega 3 ele sai daqui para um cofre de segredos.
+        secret: dev-secret-change-me-0123456789abcdef
+
+services:
+  - name: auth
+    url: http://order-service:8080/auth
+    routes: [{ name: auth, paths: [/api/auth], strip_path: true }]
+    plugins:
+      - name: rate-limiting
+        config: { minute: 60, policy: local, limit_by: ip }
+
+  - name: orders
+    url: http://order-service:8080/orders
+    routes: [{ name: orders, paths: [/api/orders], strip_path: true }]
+    plugins:
+      - name: jwt
+        config: { claims_to_verify: [exp], key_claim_name: iss }
+      - name: rate-limiting
+        config: { second: 5000, policy: local, limit_by: ip }
+
+  - name: wallet
+    url: http://order-service:8080/wallet
+    routes: [{ name: wallet, paths: [/api/wallet], strip_path: true }]
+    plugins:
+      - name: jwt
+        config: { claims_to_verify: [exp], key_claim_name: iss }
+
+  - name: quotes
+    url: http://quote-service:8080/quotes
+    routes: [{ name: quotes, paths: [/api/quotes], strip_path: true }]
+    plugins:
+      - name: rate-limiting
+        config: { second: 500, policy: local, limit_by: ip }
+
+  - name: quotes-ws
+    url: http://quote-service:8080/ws
+    routes: [{ name: quotes-ws, paths: [/ws], strip_path: true }]
+
+  - name: naive
+    url: http://naive-service:8080/naive
+    routes: [{ name: naive, paths: [/api/naive], strip_path: true }]
+
+plugins:
+  - name: prometheus
+    config: { status_code_metrics: true, latency_metrics: true }
+  - name: correlation-id
+    config: { header_name: X-Request-ID, generator: uuid, echo_downstream: true }

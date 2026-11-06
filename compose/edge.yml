@@ -1,0 +1,22 @@
+# Borda: Kong em modo DB-less (configuração declarativa em deploy/kong/kong.yml).
+# Valida JWT, aplica rate limit, gera X-Request-ID e expõe métricas para o Prometheus.
+# Sem depends_on nos serviços da aplicação: eles ficam no perfil "app" e o Kong
+# resolve os upstreams só na hora da requisição.
+
+services:
+  kong:
+    image: kong:3.8
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong/kong.yml
+      KONG_PROXY_LISTEN: 0.0.0.0:8000
+      KONG_ADMIN_LISTEN: 127.0.0.1:8001
+      KONG_STATUS_LISTEN: 0.0.0.0:8100
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+    volumes: [./deploy/kong:/kong:ro]
+    ports: ["8000:8000"]
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 5s
+      retries: 20
