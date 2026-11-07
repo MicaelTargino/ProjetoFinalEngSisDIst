@@ -1,0 +1,60 @@
+name: ci
+
+on:
+  push: { branches: [main] }
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: build e testes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: go.mod }
+      - name: Formatação
+        run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+      - name: Vet
+        run: go vet ./...
+      - name: Testes unitários (com detector de race)
+        run: go test -race -coverprofile=coverage.out ./...
+      - name: Fuzz do livro de ofertas
+        run: go test -run='^$' -fuzz=FuzzBookNeverCrosses -fuzztime=30s ./internal/orderbook
+      - uses: actions/upload-artifact@v4
+        with: { name: coverage, path: coverage.out }
+
+  migrations:
+    name: migrations no PostgreSQL
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_USER: exchange, POSTGRES_PASSWORD: exchange, POSTGRES_DB: exchange }
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U exchange" --health-interval 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Aplicar migrations
+        run: psql postgres://exchange:exchange@localhost:5432/exchange -v ON_ERROR_STOP=1 -f migrations/001_init.sql
+
+  compose:
+    name: ambiente (docker compose)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cp .env.example .env
+      - name: Validar arquivos do Compose
+        run: docker compose config -q && docker compose --profile app config -q
+      - name: Subir a infraestrutura e esperar ficar saudável
+        run: docker compose up -d --wait --wait-timeout 180 kafka postgres redis kong prometheus grafana
+      - name: Conferir tópicos do Kafka
+        run: |
+          docker compose up kafka-init
+          docker compose exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list | grep -x orders
+      - if: failure()
+        run: docker compose ps && docker compose logs --tail=100
+      - if: always()
+        run: docker compose down -v
