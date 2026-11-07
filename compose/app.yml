@@ -1,0 +1,56 @@
+# Serviços da aplicação. Ficam no perfil "app" até o código entrar no repositório:
+#   docker compose --profile app up -d --build
+x-go-service: &go-service
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD", "/app", "healthcheck"]
+    interval: 5s
+    timeout: 3s
+    retries: 10
+  environment: &go-env
+    KAFKA_BROKERS: kafka:9092
+    DATABASE_URL: postgres://exchange:${POSTGRES_PASSWORD:-exchange}@postgres:5432/exchange
+    REDIS_ADDR: redis:6379
+
+services:
+  order-service:
+    <<: *go-service
+    profiles: [app]
+    build: { context: ., args: { SERVICE: order-service } }
+    environment:
+      <<: *go-env
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env}
+      MAX_OUTBOX_BACKLOG: ${MAX_OUTBOX_BACKLOG:-5000}
+    deploy: { replicas: 2 }
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka-init: { condition: service_completed_successfully }
+
+  matching-engine:
+    <<: *go-service
+    profiles: [app]
+    build: { context: ., args: { SERVICE: matching-engine } }
+    deploy: { replicas: 3 }
+    depends_on:
+      kafka-init: { condition: service_completed_successfully }
+
+  quote-service:
+    <<: *go-service
+    profiles: [app]
+    build: { context: ., args: { SERVICE: quote-service } }
+    environment:
+      <<: *go-env
+      WS_ALLOWED_ORIGINS: "*"
+    deploy: { replicas: 2 }
+    depends_on:
+      redis: { condition: service_healthy }
+      kafka-init: { condition: service_completed_successfully }
+
+  # Grupo de controle do experimento de atualização perdida.
+  naive-service:
+    <<: *go-service
+    profiles: [app]
+    build: { context: ., args: { SERVICE: naive-service } }
+    deploy: { replicas: 3 }
+    depends_on:
+      postgres: { condition: service_healthy }
